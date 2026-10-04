@@ -1,0 +1,7 @@
+{
+  "name": "broken-node-fixture",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=99.0.0"
+  }
+}
