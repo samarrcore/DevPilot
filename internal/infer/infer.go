@@ -9,16 +9,13 @@ import (
 	"strings"
 )
 
-// ExpectedEnv holds expectations inferred deterministically from repository manifests.
-type ExpectedEnv struct {
-	NodeRange  string // e.g. ">=18.0.0", "^20.0.0", "20.11.0"
-	NodeSource string // file where requirement was detected: "package.json", ".nvmrc", ".node-version"
-}
-
 type packageJSON struct {
-	Engines struct {
+	Name            string            `json:"name"`
+	Engines         struct {
 		Node string `json:"node"`
 	} `json:"engines"`
+	Dependencies    map[string]string `json:"dependencies"`
+	DevDependencies map[string]string `json:"devDependencies"`
 }
 
 const (
@@ -69,35 +66,54 @@ func readUntrustedManifest(rootDir, filename string) ([]byte, error) {
 func Infer(dir string) (*ExpectedEnv, error) {
 	expected := &ExpectedEnv{}
 
+	var parsedPkg *packageJSON
+
 	// 1. Check package.json
 	if data, err := readUntrustedManifest(dir, "package.json"); err == nil {
 		var pkg packageJSON
-		if err := json.Unmarshal(data, &pkg); err == nil && pkg.Engines.Node != "" {
-			expected.NodeRange = strings.TrimSpace(pkg.Engines.Node)
-			expected.NodeSource = "package.json (engines.node)"
-			return expected, nil
+		if err := json.Unmarshal(data, &pkg); err == nil {
+			parsedPkg = &pkg
+			expected.ProjectName = pkg.Name
+			if pkg.Engines.Node != "" {
+				expected.NodeRange = strings.TrimSpace(pkg.Engines.Node)
+				expected.NodeSource = "package.json (engines.node)"
+			}
 		}
 	}
 
-	// 2. Check .nvmrc
-	if data, err := readUntrustedManifest(dir, ".nvmrc"); err == nil {
-		val := strings.TrimSpace(string(data))
-		if val != "" {
-			expected.NodeRange = val
-			expected.NodeSource = ".nvmrc"
-			return expected, nil
+	// 2. Infer React Native & Expo specifics
+	inferReactNative(dir, parsedPkg, expected)
+
+	// 3. Fallback: check .nvmrc if Node range unset
+	if expected.NodeRange == "" {
+		if data, err := readUntrustedManifest(dir, ".nvmrc"); err == nil {
+			val := strings.TrimSpace(string(data))
+			if val != "" {
+				expected.NodeRange = val
+				expected.NodeSource = ".nvmrc"
+			}
 		}
 	}
 
-	// 3. Check .node-version
-	if data, err := readUntrustedManifest(dir, ".node-version"); err == nil {
-		val := strings.TrimSpace(string(data))
-		if val != "" {
-			expected.NodeRange = val
-			expected.NodeSource = ".node-version"
-			return expected, nil
+	// 4. Fallback: check .node-version if Node range unset
+	if expected.NodeRange == "" {
+		if data, err := readUntrustedManifest(dir, ".node-version"); err == nil {
+			val := strings.TrimSpace(string(data))
+			if val != "" {
+				expected.NodeRange = val
+				expected.NodeSource = ".node-version"
+			}
 		}
 	}
+
+	// 5. Check .tool-versions (asdf / mise)
+	inferToolVersions(dir, expected)
+
+	// 6. Check Gradle and Android configuration
+	inferGradle(dir, expected)
+
+	// 7. Check CI workflows (.github/workflows)
+	inferCI(dir, expected)
 
 	return expected, nil
 }

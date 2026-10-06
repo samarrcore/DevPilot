@@ -108,8 +108,8 @@ func runPreflight(args []string) {
 	findings = append(findings, rules.EvaluateNode(nodeActual, expected))
 	findings = append(findings, rules.EvaluateNpm(npmActual))
 	findings = append(findings, rules.EvaluateGit(gitActual))
-	findings = append(findings, rules.EvaluateJava(javaActual, winEnvActual))
-	findings = append(findings, rules.EvaluateAndroid(androidSdkActual, adbActual)...)
+	findings = append(findings, rules.EvaluateJava(javaActual, winEnvActual, expected))
+	findings = append(findings, rules.EvaluateAndroid(androidSdkActual, adbActual, expected)...)
 
 	// Machine / Windows environment rules
 	findings = append(findings, rules.EvaluateWindowsEnvironment(winEnvActual)...)

@@ -3,6 +3,7 @@ package rules
 import (
 	"testing"
 
+	"devpilot/internal/infer"
 	"devpilot/internal/model"
 	"devpilot/internal/probe"
 )
@@ -34,41 +35,58 @@ func TestEvaluateNpm(t *testing.T) {
 }
 
 func TestEvaluateJava(t *testing.T) {
-	// Missing Java
-	fMissing := EvaluateJava(probe.ToolResult{Found: false}, probe.WindowsEnvResult{})
+	// Missing Java in general project -> Caution
+	fMissing := EvaluateJava(probe.ToolResult{Found: false}, probe.WindowsEnvResult{}, nil)
 	if fMissing.Severity != model.SeverityCaution {
-		t.Errorf("expected Caution for missing java, got: %+v", fMissing)
+		t.Errorf("expected Caution for missing java in generic project, got: %+v", fMissing)
+	}
+
+	// Missing Java in React Native project -> Grounded blocker
+	rnExpected := &infer.ExpectedEnv{IsReactNative: true, JavaRange: "17"}
+	fMissingRN := EvaluateJava(probe.ToolResult{Found: false}, probe.WindowsEnvResult{}, rnExpected)
+	if fMissingRN.Severity != model.SeverityGrounded {
+		t.Errorf("expected Grounded for missing java in RN project, got: %+v", fMissingRN)
 	}
 
 	// Java found but JAVA_HOME unset
-	fUnset := EvaluateJava(probe.ToolResult{Found: true, Version: "21.0.2"}, probe.WindowsEnvResult{JavaHomeSet: false})
+	fUnset := EvaluateJava(probe.ToolResult{Found: true, Version: "21.0.2"}, probe.WindowsEnvResult{JavaHomeSet: false}, nil)
 	if fUnset.ID != "RULE-JAVA-HOME-UNSET" || fUnset.Severity != model.SeverityCaution {
 		t.Errorf("expected RULE-JAVA-HOME-UNSET, got: %+v", fUnset)
 	}
 
 	// Java found and JAVA_HOME valid
-	fOk := EvaluateJava(probe.ToolResult{Found: true, Version: "21.0.2"}, probe.WindowsEnvResult{JavaHomeSet: true, JavaHomeValid: true})
+	fOk := EvaluateJava(probe.ToolResult{Found: true, Version: "21.0.2"}, probe.WindowsEnvResult{JavaHomeSet: true, JavaHomeValid: true}, nil)
 	if fOk.Severity != model.SeverityClear {
 		t.Errorf("expected Clear, got: %+v", fOk)
 	}
 }
 
 func TestEvaluateAndroid(t *testing.T) {
-	// SDK missing
+	// SDK missing in generic project -> Caution
 	sdkMissing := probe.AndroidSDKResult{DirectoryExists: false}
 	adbMissing := probe.ToolResult{Found: false}
-	findings := EvaluateAndroid(sdkMissing, adbMissing)
+	findings := EvaluateAndroid(sdkMissing, adbMissing, nil)
 	if len(findings) != 2 {
 		t.Fatalf("expected 2 findings, got %d", len(findings))
 	}
 	if findings[0].ID != "RULE-ANDROID-SDK-MISSING" || findings[1].ID != "RULE-ADB-MISSING" {
 		t.Errorf("unexpected findings: %+v", findings)
 	}
+	if findings[0].Severity != model.SeverityCaution {
+		t.Errorf("expected Caution for generic project, got: %s", findings[0].Severity)
+	}
+
+	// SDK missing in React Native project -> Grounded blocker!
+	rnExpected := &infer.ExpectedEnv{IsReactNative: true}
+	findingsRN := EvaluateAndroid(sdkMissing, adbMissing, rnExpected)
+	if findingsRN[0].Severity != model.SeverityGrounded || findingsRN[1].Severity != model.SeverityGrounded {
+		t.Errorf("expected Grounded in RN project for missing SDK & ADB, got: %s and %s", findingsRN[0].Severity, findingsRN[1].Severity)
+	}
 
 	// SDK OK, ADB OK
 	sdkOk := probe.AndroidSDKResult{DirectoryExists: true, HasPlatformTools: true}
 	adbOk := probe.ToolResult{Found: true, Version: "1.0.41"}
-	findingsOk := EvaluateAndroid(sdkOk, adbOk)
+	findingsOk := EvaluateAndroid(sdkOk, adbOk, nil)
 	if len(findingsOk) != 2 || findingsOk[0].Severity != model.SeverityClear || findingsOk[1].Severity != model.SeverityClear {
 		t.Errorf("expected 2 Clear findings, got: %+v", findingsOk)
 	}
