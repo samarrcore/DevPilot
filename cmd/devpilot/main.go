@@ -92,16 +92,33 @@ func runPreflight(args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// 2. Safe allowlisted probes
 	nodeActual := probe.ProbeNode(ctx, execer)
+	npmActual := probe.ProbeNpm(ctx, execer)
+	gitActual := probe.ProbeGit(ctx, execer)
+	javaActual := probe.ProbeJava(ctx, execer)
+	adbActual := probe.ProbeAdb(ctx, execer)
+	androidSdkActual := probe.ProbeAndroidSDK()
+	winEnvActual := probe.ReadWindowsEnvironment()
 
 	// 3. Rule evaluation
-	finding := rules.EvaluateNode(nodeActual, expected)
+	var findings []model.Finding
+
+	// Tooling rules
+	findings = append(findings, rules.EvaluateNode(nodeActual, expected))
+	findings = append(findings, rules.EvaluateNpm(npmActual))
+	findings = append(findings, rules.EvaluateGit(gitActual))
+	findings = append(findings, rules.EvaluateJava(javaActual, winEnvActual))
+	findings = append(findings, rules.EvaluateAndroid(androidSdkActual, adbActual)...)
+
+	// Machine / Windows environment rules
+	findings = append(findings, rules.EvaluateWindowsEnvironment(winEnvActual)...)
 
 	// 4. Construct final report with redacted target path
 	rep := &model.Report{
 		Timestamp: time.Now(),
 		TargetDir: security.RedactPath(targetDir),
-		Findings:  []model.Finding{finding},
+		Findings:  findings,
 	}
 	rep.ComputeSummary()
 

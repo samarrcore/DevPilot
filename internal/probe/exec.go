@@ -19,11 +19,12 @@ type Execer interface {
 // AllowedCommands maps an approved binary to its permitted arguments.
 // Any command invocation outside this allowlist is rejected immediately.
 var AllowedCommands = map[string][]string{
-	"node": {"-v", "--version"},
-	"npm":  {"-v", "--version"},
-	"java": {"-version", "--version"},
-	"adb":  {"version"},
-	"git":  {"--version"},
+	"node":   {"-v", "--version"},
+	"npm":    {"-v", "--version"},
+	"java":   {"-version", "--version"},
+	"adb":    {"version"},
+	"git":    {"--version"},
+	"gradle": {"-v", "--version"},
 }
 
 const (
