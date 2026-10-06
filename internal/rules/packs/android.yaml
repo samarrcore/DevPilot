@@ -1,0 +1,84 @@
+name: android-toolchain
+description: Declarative rules for Android SDK, platform-tools, and ADB
+version: 1.0.0
+rules:
+  - id: RULE-ANDROID-SDK-MISSING
+    title: Android SDK is not configured or directory does not exist
+    category: tooling
+    severity: Caution
+    elevate_if: android_required
+    condition:
+      target: android_sdk
+      state: directory_missing
+    evidence:
+      - key: status
+        value: directory not found
+        source: probe:android_sdk
+    fix:
+      action_type: set_env_var
+      title: Install Android Studio / SDK and set ANDROID_HOME
+      params:
+        variable: ANDROID_HOME
+      explanation: Install Android Studio with SDK Command-line Tools and set ANDROID_HOME to %LOCALAPPDATA%\Android\Sdk.
+    risk: medium
+    verify: adb version
+
+  - id: RULE-ANDROID-PLATFORM-TOOLS-MISSING
+    title: Android SDK is missing platform-tools component
+    category: tooling
+    severity: Caution
+    elevate_if: android_required
+    condition:
+      target: android_sdk
+      state: platform_tools_missing
+    evidence:
+      - key: platform_tools
+        value: missing
+        source: probe:android_sdk
+    fix:
+      action_type: install_tool_version
+      title: Install Android SDK Platform-Tools via Android Studio SDK Manager
+      params:
+        component: platform-tools
+      explanation: Platform-tools includes adb, which is required to communicate with Android devices and emulators.
+    risk: low
+    verify: adb version
+
+  - id: RULE-ANDROID-SDK-OK
+    title: Android SDK directory is flight-ready
+    category: tooling
+    severity: Clear
+    condition:
+      target: android_sdk
+      state: ok
+    verify: adb version
+
+  - id: RULE-ADB-MISSING
+    title: Android Debug Bridge (adb) is not on PATH
+    category: tooling
+    severity: Caution
+    elevate_if: android_required
+    condition:
+      target: adb
+      state: missing
+    evidence:
+      - key: status
+        value: missing from PATH
+        source: probe:adb
+    fix:
+      action_type: set_env_var
+      title: Add %ANDROID_HOME%\platform-tools to your User PATH
+      params:
+        variable: PATH
+      explanation: Adding platform-tools to PATH enables 'adb' and Expo/React Native Android tooling.
+    risk: low
+    verify: adb version
+
+  - id: RULE-ADB-OK
+    title: Android Debug Bridge is flight-ready
+    category: tooling
+    severity: Clear
+    condition:
+      target: adb
+      state: ok
+    verify: adb version

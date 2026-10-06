@@ -98,6 +98,7 @@ func runPreflight(args []string) {
 	gitActual := probe.ProbeGit(ctx, execer)
 	javaActual := probe.ProbeJava(ctx, execer)
 	adbActual := probe.ProbeAdb(ctx, execer)
+	gradleActual := probe.ProbeGradle(ctx, execer)
 	androidSdkActual := probe.ProbeAndroidSDK()
 	winEnvActual := probe.ReadWindowsEnvironment()
 
@@ -113,6 +114,29 @@ func runPreflight(args []string) {
 
 	// Machine / Windows environment rules
 	findings = append(findings, rules.EvaluateWindowsEnvironment(winEnvActual)...)
+
+	// Declarative YAML rule packs & compatibility matrices
+	engine, err := rules.NewEngine()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to initialize YAML rule engine: %v\n", err)
+	} else {
+		if err := engine.LoadProjectRules(targetDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to load project custom rules: %v\n", err)
+		}
+		evalCtx := rules.EvaluationContext{
+			Expected:   expected,
+			Node:       nodeActual,
+			Npm:        npmActual,
+			Git:        gitActual,
+			Java:       javaActual,
+			Adb:        adbActual,
+			Gradle:     gradleActual,
+			AndroidSDK: androidSdkActual,
+			WinEnv:     winEnvActual,
+		}
+		engineFindings := engine.Evaluate(evalCtx)
+		findings = rules.MergeFindings(findings, engineFindings)
+	}
 
 	// 4. Construct final report with redacted target path
 	rep := &model.Report{

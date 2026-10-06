@@ -1,0 +1,55 @@
+name: node-runtime
+description: Declarative rules for Node.js runtime environment
+version: 1.0.0
+rules:
+  - id: RULE-NODE-MISSING
+    title: Node.js runtime is not installed or not in PATH
+    category: tooling
+    severity: Grounded
+    condition:
+      target: node
+      state: missing
+    evidence:
+      - key: status
+        value: missing
+        source: probe:node
+    fix:
+      action_type: install_tool_version
+      title: Install Node.js (LTS recommended)
+      params:
+        tool: node
+        version: lts
+      explanation: DevPilot requires Node.js to be installed and available on your system PATH.
+    risk: low
+    verify: node -v
+
+  - id: RULE-NODE-VERSION-MISMATCH
+    title: Node.js version does not satisfy project requirements
+    category: tooling
+    severity: Caution
+    elevate_if: major_mismatch
+    condition:
+      target: node
+      state: version_mismatch
+    evidence:
+      - key: status
+        value: version mismatch
+        source: probe:node
+    fix:
+      action_type: install_tool_version
+      title: Switch or update Node.js to match project requirements
+      params:
+        tool: node
+        version: target
+      explanation: "Running an incompatible Node runtime causes syntax failures, module resolution errors, or native build crashes. Recommendation: nvm install or winget install OpenJS.NodeJS.LTS"
+    risk: medium
+    verify: node -v
+
+  - id: RULE-NODE-OK
+    title: Node.js runtime is flight-ready
+    category: tooling
+    severity: Clear
+    condition:
+      target: node
+      state: ok
+    verify: node -v
